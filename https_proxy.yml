@@ -1,0 +1,113 @@
+---
+- name: Configure Yum to use an HTTP proxy
+  hosts: storage
+  tags:
+    - proxy
+  vars:
+    http_proxy:
+      host: "{{ provision_oc_net_name | net_ip('seed-0')}}"
+      port: 3128
+    https_proxy:
+      host: "{{ provision_oc_net_name | net_ip('seed-0')}}"
+      port: 3128
+  tasks:
+    - name: Enable use of the proxy server for Yum caching
+      ini_file:
+        path: /etc/yum.conf
+        section: main
+        option: "proxy"
+        value: "http://{{ http_proxy.host }}:{{ http_proxy.port }}"
+      become: true
+
+    - name: Write http_proxy parameters to bashrc file
+      lineinfile:
+        path: "{{ ansible_user_dir }}/.bashrc"
+        create: yes
+        mode: 0755
+        state: present
+        regexp: "^export http_proxy=.*"
+        line: "export http_proxy=http://{{ http_proxy.host }}:{{ http_proxy.port }}"
+
+    - name: Write https_proxy parameters to bashrc file
+      lineinfile:
+        path: "{{ ansible_user_dir }}/.bashrc"
+        create: yes
+        mode: 0755
+        state: present
+        regexp: "^export https_proxy=.*"
+        line: "export https_proxy=http://{{ https_proxy.host }}:{{ https_proxy.port }}"
+
+    - name: Write http_proxy parameters to bashrc file for root user
+      lineinfile:
+        path: "/root/.bashrc"
+        create: yes
+        mode: 0755
+        state: present
+        regexp: "^export http_proxy=.*"
+        line: "export http_proxy=http://{{ http_proxy.host }}:{{ http_proxy.port }}"
+      become: true
+
+    - name: Write https_proxy parameters to bashrc file for root user
+      lineinfile:
+        path: "/root/.bashrc"
+        create: yes
+        mode: 0755
+        state: present
+        regexp: "^export https_proxy=.*"
+        line: "export https_proxy=http://{{ https_proxy.host }}:{{ https_proxy.port }}"
+      become: true
+
+    - name: Esure Docker client config directory exists
+      file:
+        path: "{{ ansible_user_dir }}/.docker"
+        state: "directory"
+        mode: "0700"
+
+    - name: Write Docker client config to use HTTP proxy
+      template:
+        src: "docker-config.j2"
+        dest: "{{ ansible_user_dir }}/.docker/config.json"
+        mode: "0644"
+
+    - name: Esure Docker client config directory exists for root
+      file:
+        path: "/root/.docker"
+        state: "directory"
+        mode: "0700"
+      become: true
+
+    - name: Write Docker client config to use HTTP proxy for root
+      template:
+        src: "docker-config.j2"
+        dest: "/root/.docker/config.json"
+        mode: "0644"
+      become: true
+
+    - name: Create Systemd configuration directory for Docker daemon
+      file:
+        path: "/etc/systemd/system/docker.service.d"
+        state: "directory"
+        mode: "0755"
+        owner: "root"
+        group: "root"
+      become: true
+
+    - name: Write Systemd unit configuration override for Docker daemon
+      template:
+        src: "docker-env.j2"
+        dest: "/etc/systemd/system/docker.service.d/https-proxy.conf"
+        mode: "0644"
+      become: true
+      notify:
+        - "Restart Docker Daemon"
+
+  handlers:
+    - name: Restart Docker Daemon
+      systemd:
+        daemon_reload: yes
+        name: "docker"
+        enabled: "yes"
+        state: "restarted"
+      become: true
+        
+

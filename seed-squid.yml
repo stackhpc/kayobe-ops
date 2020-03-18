@@ -1,0 +1,51 @@
+---
+- name: Install & configure Squid proxy on the Seed VM
+  hosts: seed
+  become: yes
+  gather_facts: yes
+  vars:
+    squid_pri_domain_name: 'openstacklocal'
+  roles:
+    - role: mrlesmithjr.squid
+  tasks:
+    - name: Force Squid to use IPv4
+      lineinfile:
+        path: /etc/squid/squid.conf
+        line: "dns_v4_first on"
+        insertbefore: "# ACLS"
+        state: present
+        backup: yes
+      notify:
+        - Restart Squid
+    - name: Enable Squid Systemd service
+      systemd:
+        name: squid
+        enabled: yes
+        masked: no
+        state: started
+  handlers:
+    - name: Restart Squid
+      service:
+        name: squid
+        state: restarted
+
+- name: Configure overcloud hosts to use Squid for YUM
+  hosts:
+    - overcloud
+  tags:
+    - proxy
+  vars:
+    http_proxy:
+      host: "{{ provision_oc_net_name | net_ip('seed-0')}}"
+      port: 3128
+    https_proxy:
+      host: "{{ provision_oc_net_name | net_ip('seed-0')}}"
+      port: 3128
+  tasks:
+    - name: Enable use of the proxy server for Yum caching
+      ini_file:
+        path: /etc/yum.conf
+        section: main
+        option: "proxy"
+        value: "http://{{ http_proxy.host }}:{{ http_proxy.port }}"
+      become: true

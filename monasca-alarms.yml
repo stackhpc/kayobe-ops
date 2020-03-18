@@ -1,0 +1,15 @@
+- name: Create Monasca notification method and alarms
+  hosts: localhost
+  gather_facts: yes
+  vars:
+    keystone_url: "http://{{ internal_net_vip_address }}:5000/v3"
+    keystone_project: "monasca"
+    monasca_endpoint_interface: ["internal"]
+    notification_address: "{{ secrets_monasca_slack_webhook }}"
+    notification_name: "Default Slack Notification"
+    notification_type: "SLACK"
+    monasca_client_virtualenv_dir: "{{ ansible_env.VIRTUAL_ENV | default(omit) }}"
+    virtualenv_become: "no"
+    skip_tasks: ["misc", "openstack", "monasca"]
+  roles:
+    - {role: stackhpc.monasca_default_alarms, tags: [alarms]}
