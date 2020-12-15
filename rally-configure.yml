@@ -1,4 +1,10 @@
 ---
+# Playbook to configure rally in kolla-ansible with external recipies
+# 'tempest_recipes_branch' and 'ANSIBLE_VAULT_PASSWORD_FILE' should be configured according to environment
+# Playbook is dependent on setting in k-a globals.yml:
+#rally_extra_volumes:
+#  - "/opt/kayobe/rally:/var/lib/rally"
+
 - name: Generate rally config
   hosts: localhost
   vars:
