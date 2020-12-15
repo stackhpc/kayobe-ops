@@ -1,10 +1,12 @@
-
 ---
 - name: Generate rally config
   hosts: localhost
   vars:
     deployment_path: "/home/stack/deployment"
     tempest_recipes_branch: "ebi"
+    kolla_ansible_passwords: "{{ lookup('file', lookup('env', 'KOLLA_CONFIG_PATH') + '/passwords.yml') | from_yaml }}"
+  environment:
+    ANSIBLE_VAULT_PASSWORD_FILE: "{{ deployment_path }}/vault.secret"
   tags:
     - rally-config
   tasks:
