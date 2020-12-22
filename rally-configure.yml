@@ -1,6 +1,6 @@
 ---
 # Playbook to configure rally in kolla-ansible with external recipies
-# 'tempest_recipes_branch' and 'ANSIBLE_VAULT_PASSWORD_FILE' should be configured according to environment
+# 'tempest_recipes_branch' should be configured according to the environment
 # Playbook is dependent on setting in k-a globals.yml:
 #rally_extra_volumes:
 #  - "/opt/kayobe/rally:/var/lib/rally"
@@ -10,12 +10,12 @@
   vars:
     tempest_recipes_branch: "ebi"
     deployment_path: "{{ lookup('env', 'KAYOBE_CONFIG_PATH') | regex_replace('/src/kayobe-config/etc/kayobe$', '') }}"
-    kolla_ansible_passwords: "{{ lookup('file', lookup('env', 'KOLLA_CONFIG_PATH') + '/passwords.yml') | from_yaml }}"
-  environment:
-    ANSIBLE_VAULT_PASSWORD_FILE: "{{ deployment_path }}/vault.secret"
   tags:
     - rally-config
   tasks:
+    - name: Include Kolla passwords for admin account credentials
+      include_vars: "{{ kayobe_config_path }}/kolla/passwords.yml"
+
     - name: Ensure shakespere config directory exists
       file:
         path: "{{ deployment_path }}/src/rally/{{ item }}"
@@ -49,7 +49,7 @@
 
     - name: Generate Tempest config for Rally
       command:
-        cmd: "{{ deployment_path }}/venvs/rally/bin/ansible-playbook template.yml -e @../tempest-recipes/prod-ussuri-no-cinder-backup.recipe.yml"
+        cmd: "{{ deployment_path }}/venvs/rally/bin/ansible-playbook template.yml -e @../tempest-recipes/prod.yml"
         chdir: "{{ deployment_path }}/src/rally/shakespeare"
 
     - name: Template 'existing-keystone-v3.json'
