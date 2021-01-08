@@ -1,0 +1,16 @@
+{
+    "openstack": {
+        "auth_url": "http://{{ internal_net_vip_address }}:35357/v3",
+        "region_name": "RegionOne",
+        "endpoint_type": "internal",
+        "admin": {
+            "username": "admin",
+            "password": "{{ keystone_admin_password }}",
+            "user_domain_name": "Default",
+            "project_name": "admin",
+            "project_domain_name": "Default"
+        },
+        "https_insecure": false,
+        "https_cacert": ""
+    }
+}

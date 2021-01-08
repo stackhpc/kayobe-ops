@@ -1,0 +1,130 @@
+---
+# Playbook to configure rally in kolla-ansible with external recipies
+# 'tempest_recipes_branch' should be configured according to the environment
+# Playbook is dependent on setting in k-a globals.yml:
+#rally_extra_volumes:
+#  - "/opt/kayobe/rally:/var/lib/rally"
+
+- name: Generate rally config
+  hosts: localhost
+  vars:
+    tempest_recipes_branch: "ebi"
+    deployment_path: "{{ lookup('env', 'KAYOBE_CONFIG_PATH') | regex_replace('/src/kayobe-config/etc/kayobe$', '') }}"
+  tags:
+    - rally-config
+  tasks:
+    - name: Include Kolla passwords for admin account credentials
+      include_vars: "{{ kayobe_config_path }}/kolla/passwords.yml"
+
+    - name: Ensure shakespere config directory exists
+      file:
+        path: "{{ deployment_path }}/src/rally/{{ item }}"
+        state: directory
+        recurse: yes
+      with_items: ["shakespeare", "config", "tempest-recipes"]
+
+    - name: Clone shakespeare
+      git:
+        repo: https://github.com/stackhpc/shakespeare.git
+        dest: "{{ deployment_path }}/src/rally/shakespeare"
+
+    - name: Clone tempest-recipes
+      git:
+        repo: https://github.com/stackhpc/tempest-recipes.git
+        dest: "{{ deployment_path }}/src/rally/tempest-recipes"
+        version: "{{ tempest_recipes_branch }}"
+
+    - name: Ensure rally venv has latest pip version installed
+      pip:
+        name: pip
+        state: latest
+        virtualenv: "{{ deployment_path }}/venvs/rally"
+        virtualenv_python: "python3.{{ ansible_python.version.minor }}"
+
+    - name: Ensure shakespeare deps are installed
+      pip:
+        requirements: "{{ deployment_path }}/src/rally/shakespeare/requirements.txt"
+        virtualenv: "{{ deployment_path }}/venvs/rally"
+        virtualenv_python: "python3.{{ ansible_python.version.minor }}"
+
+    - name: Generate Tempest config for Rally
+      command:
+        cmd: "{{ deployment_path }}/venvs/rally/bin/ansible-playbook template.yml -e @../tempest-recipes/prod.yml"
+        chdir: "{{ deployment_path }}/src/rally/shakespeare"
+
+    - name: Template 'existing-keystone-v3.json'
+      template:
+        src: "./templates/existing-keystone-v3.json.j2"
+        dest: "{{ deployment_path }}/src/rally/config/existing-keystone-v3.json"
+        mode: 0640
+
+
+- name: Copy rally files to volumes
+  hosts: controllers
+  become: true
+  vars:
+    deployment_path: "{{ lookup('env', 'KAYOBE_CONFIG_PATH') | regex_replace('/src/kayobe-config/etc/kayobe$', '') }}"
+    rally_config_files:
+      - tempest.conf
+      - existing-keystone-v3.json
+  tags:
+    - rally-copy-config
+  tasks:
+    - name: Ensure rally config directory exists
+      file:
+        path: /opt/kayobe/rally
+        state: directory
+        owner: 42440
+        group: 42440
+
+    - name: Copy rally config files
+      copy:
+        src: "{{ deployment_path }}/src/rally/config/{{ item }}"
+        dest: "/opt/kayobe/rally/{{ item }}"
+        mode: 0600
+        owner: 42440
+        group: 42440
+      with_items: "{{ rally_config_files }}"
+
+
+- name: Configure Rally
+  hosts: controllers[0]
+  become: true
+  tags:
+    - rally-configure
+  tasks:
+    - name: Ensure db is configured
+      command:
+        cmd: "docker exec rally rally db ensure"
+
+    - name: List deployments
+      command:
+        cmd: "docker exec rally rally deployment list"
+      register: rally_deployments
+
+    - name: Print deployments
+      debug:
+        var: rally_deployments
+
+    - name: Create deployment
+      command:
+        cmd: "docker exec rally rally deployment create --file /var/lib/rally/existing-keystone-v3.json --name production"
+      when: '"There are no deployments" in rally_deployments.stdout'
+
+    - name: List verifiers
+      command:
+        cmd: "docker exec rally rally verify list-verifiers"
+      register: rally_list_verifiers
+
+    - name: Print verifiers
+      debug:
+        var: rally_list_verifiers
+
+    - name: Create rally verifier
+      command:
+        cmd: "docker exec rally rally verify create-verifier --name default --type tempest"
+      when: '"There are no verifiers" in rally_list_verifiers.stdout'
+
+    - name: Configure rally verifier
+      command:
+        cmd: "docker exec rally rally verify configure-verifier --reconfigure --extend /var/lib/rally/tempest.conf"
