@@ -1,0 +1,43 @@
+---
+# This playbook ensures that KVM is loaded with nested virtualization support.
+# It needs to be run while no virtual machines are executing on the hypervisor.
+#
+# NOTE(priteau): Does not support AMD processors yet
+
+- hosts: compute
+  become: true
+  tasks:
+  - name: Check for CPU Virtualization
+    shell: "lscpu | grep ^Virtualization"
+    register: lscpu
+    changed_when: false
+    failed_when: "lscpu.rc != 0"
+  - name: Verify KVM module is loaded
+    shell: "lsmod | egrep 'kvm_(amd|intel)'"
+    register: kvm
+    changed_when: false
+    failed_when: false
+  - name: Check if nested virtualization is supported
+    shell: "cat /sys/module/kvm_intel/parameters/nested"
+    register: nested
+    changed_when: false
+    when: kvm.rc == 0
+  - block:
+    - name: Unload the kvm_intel module
+      shell: "modprobe -r kvm_intel"
+      failed_when: false
+    - name: Activate the nesting feature
+      shell: "modprobe kvm_intel nested=1"
+    - name: Persist the nesting feature
+      lineinfile:
+        line: "options kvm_intel nested=1"
+        path: /etc/modprobe.d/kvm.conf
+        create: true
+    - name: Check again if nested virtualization is supported
+      shell: "cat /sys/module/kvm_intel/parameters/nested"
+      changed_when: false
+      register: result
+      failed_when: "'Y' not in result.stdout_lines"
+    - name: Restart nova_libvirt container
+      shell: "docker restart nova_libvirt"
+    when: "kvm.rc != 0 or 'Y' not in nested.stdout_lines"
