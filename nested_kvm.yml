@@ -37,7 +37,7 @@
       shell: "cat /sys/module/kvm_intel/parameters/nested"
       changed_when: false
       register: result
-      failed_when: "'Y' not in result.stdout_lines"
+      failed_when: "'Y' not in result.stdout_lines or '1' not in result.stdout_lines"
     - name: Restart nova_libvirt container
       shell: "docker restart nova_libvirt"
-    when: "kvm.rc != 0 or 'Y' not in nested.stdout_lines"
+    when: "kvm.rc != 0 or ('Y' not in nested.stdout_lines or '1' not in nested.stdout_lines)"
