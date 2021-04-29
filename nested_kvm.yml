@@ -40,4 +40,4 @@
       failed_when: "'Y' not in result.stdout_lines and '1' not in result.stdout_lines"
     - name: Restart nova_libvirt container
       shell: "docker restart nova_libvirt"
-    when: "kvm.rc != 0 or ('Y' not in nested.stdout_lines or '1' not in nested.stdout_lines)"
+    when: "kvm.rc != 0 or ('Y' not in nested.stdout_lines and '1' not in nested.stdout_lines)"
