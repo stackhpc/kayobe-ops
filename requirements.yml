@@ -2,3 +2,6 @@
 - mrlesmithjr.squid
 - stackhpc.monasca_default_alarms
 - stackhpc.grubcmdline
+- name: wazuh-ansible
+  src: https://github.com/wazuh/wazuh-ansible.git
+  version: v4.1.5
