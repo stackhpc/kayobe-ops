@@ -13,8 +13,6 @@ wazuh_managers:
     port: 1514
     protocol: tcp
     api_port: 55000
-    api_proto: 'http'
-    api_user: wazuh
 
 # Wazuh-Agent authd config
 wazuh_agent_authd:
