@@ -1,0 +1,23 @@
+---
+# * Configures a swapfile on hosts in the 'swapfile' group.
+# * Swap file path configured via 'swap_file_path', default '/swapfile'.
+# * Creates a swapfile of a size 20% of memory by default.
+# * Sets vm.swappiness sysctl to 10.
+#
+# To use:
+# * Add a swapfile group to the inventory, or change the hosts list to
+#   something else.
+
+- name: Ensure a swap file is configured
+  hosts: swapfile
+  become: true
+  tasks:
+    - import_role:
+        name: geerlingguy.swap
+      vars:
+        swap_file_path: /swapfile
+        # Allow 20% of memory as swap.
+        memory_swap_ratio: 5
+        swap_file_size_mb: "{{ ansible_facts.memtotal_mb // (memory_swap_ratio | int) }}"
+        # Reduce swappiness from Linux default of 60.
+        swap_swappiness: '10'
