@@ -5,7 +5,7 @@
 
 # Wazuh-Manager IP address
 # Convenience var not used by wazuh-agent role
-wazuh_manager_ip: "{{ undercloud_prov_ips.wazuh }}"
+wazuh_manager_ip: "{{ provision_oc_net_name | net_ip('wazuh') }}"
 
 # Wazuh-Manager API config
 wazuh_managers:
