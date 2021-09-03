@@ -54,7 +54,7 @@ function hwrep_ethtool
     # There isn't an obvious way to connect a representor port
     # back to the PF or VF, so apply tuning to all representor ports
     # served by the mlx5e_rep driver.
-    hwrep_devs=$(cd /sys/devices/virtual/net; for i in *
+    hwrep_devs=$(cd /sys/class/net; for i in *
     do
 	ethtool -i $i 2> /dev/null |
             awk -v dev=$i '$1=="driver:" && $2=="mlx5e_rep" {print dev}'
