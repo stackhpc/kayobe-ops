@@ -100,5 +100,6 @@ do
     ethtool -L $PF combined $SRIOV_PF_CHANNELS
 done
 
+/sbin/udevadm settle --timeout=20
 hwrep_ethtool
 
