@@ -1,0 +1,44 @@
+---
+# This playbook should run after the OpenStack services have been deployed
+# It will restart OpenVswitch if the hardware offload needs to be enabled.
+
+- name: Prepare hosts for VF-LAG support
+  hosts: compute-100G
+  tags:
+    - vflag
+  vars:
+    ovs_container: "openvswitch_vswitchd"
+  tasks:
+    # Verify Open vSwitch is up and running
+    - name: Gather data on running conatiners
+      command: "docker ps --format '{%raw%}{{.Names}}{%endraw%}'"
+      register: docker_data
+      become: true
+      changed_when: false
+
+    - name: Check the openvswitch_vswitchd docker containers are running before proceeding
+      fail:
+        msg: "Open vSwitch container not detected on {{ ansible_hostname }}"
+      when: "ovs_container not in docker_data.stdout_lines"
+
+    # Enable hardware offload on OVS
+    - name: Read OVS configuration for hardware offload
+      command: "docker exec {{ ovs_container }} ovs-vsctl get Open_vSwitch . other_config:hw-offload"
+      register: ovs_offload_config
+      become: true
+      ignore_errors: yes
+      changed_when: false
+ 
+    - name: Configure OVS to enable hardware offload
+      command: "docker exec {{ ovs_container }} ovs-vsctl set Open_vSwitch . other_config:hw-offload=true"
+      become: true
+      when: "'\"true\"' not in ovs_offload_config.stdout_lines"
+      notify:
+        - Restart OVS
+
+  handlers:
+    - name: Restart OVS
+      command: "docker restart {{ ovs_container }}"
+      become: true
+
+...

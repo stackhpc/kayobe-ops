@@ -1,0 +1,60 @@
+---
+# This playbook should execute after kayobe overcloud host configure has completed.
+
+- name: Prepare hosts for VF-LAG support
+  hosts: compute-100G
+  tags:
+    - vflag
+  tasks:
+    # Write /etc/sysconfig/sriov configuration to match this host
+    - name: Define parameters in /etc/sysconfig/sriov
+      template:
+        src: "sysconfig-sriov.j2"
+        dest: "/etc/sysconfig/sriov"
+        owner: "root"
+        group: "root"
+        mode: 0755
+      become: true
+      notify: Reboot and wait
+
+    - name: Transfer VF-LAG helper scripts to /usr/local/bin
+      copy:
+        src: "{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        owner: "root"
+        group: "root"
+        mode: 0755
+      become: true
+      with_items:
+        - "mlnx-vflag-early"
+        - "mlnx-vflag-final"
+      notify: Reboot and wait
+
+    - name: Transfer VF-LAG systemd units to /etc/systemd/system
+      template:
+        src: "{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        owner: "root"
+        group: "root"
+        mode: 0644
+      become: true
+      with_items:
+        - "mlnx-vflag-early.service"
+        - "mlnx-vflag-final.service"
+      notify: Reboot and wait
+
+    - name: Enable VF-LAG systemd units
+      systemd:
+        daemon_reload: true
+        name: "{{ item }}"
+        enabled: true
+      become: true
+      with_items:
+        - "mlnx-vflag-early.service"
+        - "mlnx-vflag-final.service"
+      notify: Reboot and wait
+
+  handlers:
+    - name: Reboot and wait
+      include_tasks: tasks/reboot.yml
+      tags: reboot

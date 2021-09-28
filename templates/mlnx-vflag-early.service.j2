@@ -1,0 +1,16 @@
+[Unit]
+Description=Early configuration for Mellanox SR-IOV and VF-LAG
+{% for nic in bond0_mgmt_bond_slaves %}
+Requires=sys-subsystem-net-devices-{{ nic }}.device
+After=sys-subsystem-net-devices-{{ nic }}.device
+{% endfor %}
+Requires=network-pre.target
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mlnx-vflag-early
+RemainAfterExit=yes
+
+[Install]
+WantedBy=network-pre.target
