@@ -6,6 +6,10 @@ After=sys-subsystem-net-devices-{{ nic }}.device
 {% endfor %}
 Requires=network-pre.target
 Before=network-pre.target
+{% if ansible_os_family == "Debian" %}
+Requires=systemd-networkd.service
+Before=systemd-networkd.service
+{% endif %}
 
 [Service]
 Type=oneshot
@@ -14,3 +18,6 @@ RemainAfterExit=yes
 
 [Install]
 WantedBy=network-pre.target
+{% if ansible_os_family == "Debian" %}
+WantedBy=systemd-networkd.service
+{% endif %}
