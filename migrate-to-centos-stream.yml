@@ -1,0 +1,27 @@
+---
+- name: Migrate DNF repositories to CentOS stream
+  hosts: seed-hypervisor:seed:overcloud:infra-vms
+  tags:
+    - migrate-to-centos-stream
+  tasks:
+    - name: Move CentOS repositories to CentOS stream
+      command:
+        cmd: >
+          dnf swap centos-linux-repos centos-stream-repos -y
+      become: true
+
+# Run the kayobe dnf.yml playbook.
+- import_playbook: "{{ ansible_playbook_python | dirname | dirname ~ '/share/kayobe/ansible/dnf.yml' }}"
+  tags:
+    - migrate-to-centos-stream
+
+- name: Run dnf distro-sync
+  hosts: seed-hypervisor:seed:overcloud:infra-vms
+  tags:
+    - migrate-to-centos-stream
+  tasks:
+    - name: Run dnf distro-sync
+      command:
+        cmd: >
+          dnf distro-sync -y
+      become: true
