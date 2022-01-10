@@ -12,6 +12,8 @@ fi
 
 PARENT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+export ANSIBLE_SERIAL=${ANSIBLE_SERIAL:-0}
+
 host=$1
 
 kayobe playbook run -vv $KAYOBE_CONFIG_PATH/ansible/migrate-to-centos-stream.yml --limit $host
