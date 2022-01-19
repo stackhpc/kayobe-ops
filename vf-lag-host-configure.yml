@@ -1,11 +1,24 @@
 ---
+# Setup of VF-LAG systemd configuration.
+# This playbook does not setup SR-IOV (perhaps it should) - see stackhpc.sriov
 # This playbook should execute after kayobe overcloud host configure has completed.
 
 - name: Prepare hosts for VF-LAG support
-  hosts: compute-100G
+  hosts: compute-sriov
   tags:
     - vflag
   tasks:
+    # /etc/sysconfig is a RedHat convention - create equivalent here
+    - name: create /etc/sysconfig for Ubuntu
+      become: true
+      file:
+        path: /etc/sysconfig
+        owner: "root"
+        group: "root"
+        mode: 0755
+        state: directory
+      when: ansible_os_family == "Debian"
+
     # Write /etc/sysconfig/sriov configuration to match this host
     - name: Define parameters in /etc/sysconfig/sriov
       template:
@@ -53,6 +66,20 @@
         - "mlnx-vflag-early.service"
         - "mlnx-vflag-final.service"
       notify: Reboot and wait
+
+    # There appears to be an issue where the reciprocal symlink from a
+    # WantedBy= to a Wants= doesn't get created.  Explicitly ensure it exists.
+    - name: Ensure the .wants symlink exists (Ubuntu)
+      block:
+        - file:
+            path: "/etc/systemd/system/systemd-networkd.service.wants"
+            state: "directory"
+        - file:
+            path: "/etc/systemd/system/systemd-networkd.service.wants/mlnx-vflag-early.service"
+            src: "/etc/systemd/system/mlnx-vflag-early.service"
+            state: "link"
+      become: true
+      when: ansible_os_family == "Debian"
 
   handlers:
     - name: Reboot and wait
