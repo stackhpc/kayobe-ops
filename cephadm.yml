@@ -1,0 +1,7 @@
+---
+- name: Run cephadm role
+  any_errors_fatal: True
+  gather_facts: True
+  hosts: ceph
+  roles:
+    - role: stackhpc.cephadm.cephadm

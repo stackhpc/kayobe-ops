@@ -1,0 +1,7 @@
+---
+- name: Run keys role
+  gather_facts: False
+  hosts: ceph
+  become: true
+  roles:
+    - role: stackhpc.cephadm.keys

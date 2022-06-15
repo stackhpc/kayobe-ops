@@ -1,0 +1,7 @@
+---
+- name: Run crush_rules role
+  gather_facts: False
+  hosts: ceph
+  become: true
+  roles:
+    - role: stackhpc.cephadm.crush_rules

@@ -1,0 +1,58 @@
+---
+- name: Run pools role
+  gather_facts: False
+  hosts: mons[0]
+  tasks:
+    - name: Get client.glance key
+      stackhpc.cephadm.cephadm_key:
+        name: "client.glance"
+        state: info
+      register: cephadm_keys
+      become: true
+      loop:
+        - client.glance
+        - client.cinder
+
+    - name: Ensure Kolla config directories are present
+      vars:
+        kayobe_config_path: "{{ lookup('env', 'KAYOBE_CONFIG_PATH') }}"
+        kayobe_environment: "{{ lookup('env', 'KAYOBE_ENVIRONMENT') }}"
+      file:
+        state: directory
+        path: "{{ kayobe_config_path }}/environments/{{ kayobe_environment }}/kolla/config/{{ item }}"
+      loop:
+        - glance
+        - cinder/cinder-volume
+      delegate_to: localhost
+
+    - name: Save keys to proper locations
+      vars:
+        cephadm_key: "{{ (item.stdout | from_json | first)['key'] }}"
+        cephadm_user: "{{ (item.stdout | from_json | first)['entity'] }}"
+        cephadm_service: "{{ cephadm_user.split('.')[1] }}"
+        kayobe_config_path: "{{ lookup('env', 'KAYOBE_CONFIG_PATH') }}"
+        kayobe_environment: "{{ lookup('env', 'KAYOBE_ENVIRONMENT') }}"
+      copy:
+        content: "{{ cephadm_key }}"
+        dest: "{{ kayobe_config_path }}/environments/{{ kayobe_environment }}/kolla/config/{{ 'cinder/cinder-volume' if cephadm_service =='cinder' else cephadm_service }}/ceph.{{ cephadm_user }}.keyring"
+      loop: "{{ cephadm_keys.results }}"
+      loop_control:
+        label: "{{ cephadm_user }}"
+      delegate_to: localhost
+
+    - name: Generate ceph.conf
+      command: "cephadm shell -- ceph config generate-minimal-conf"
+      become: true
+      register: cephadm_ceph_conf
+
+    - name: Save ceph.conf to proper locations
+      vars:
+        kayobe_config_path: "{{ lookup('env', 'KAYOBE_CONFIG_PATH') }}"
+        kayobe_environment: "{{ lookup('env', 'KAYOBE_ENVIRONMENT') }}"
+      copy:
+        content: "{{ cephadm_ceph_conf.stdout }}"
+        dest: "{{ kayobe_config_path }}/environments/{{ kayobe_environment }}/kolla/config/{{ item }}/ceph.conf"
+      loop:
+        - glance
+        - cinder/cinder-volume
+      delegate_to: localhost

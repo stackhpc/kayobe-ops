@@ -1,0 +1,7 @@
+---
+- name: Run ec_profiles role
+  gather_facts: False
+  hosts: ceph
+  become: true
+  roles:
+    - role: stackhpc.cephadm.ec_profiles
