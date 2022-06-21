@@ -8,6 +8,13 @@
   tags:
     - vflag
   tasks:
+    # TC offload requires kernel-modules-extra (act_ct module)
+    - name: Ensure kernel-modules-extra is installed
+      package:
+        name: kernel-modules-extra
+        state: present
+      when: ansible_os_family == "RedHat"
+
     # /etc/sysconfig is a RedHat convention - create equivalent here
     - name: create /etc/sysconfig for Ubuntu
       become: true
