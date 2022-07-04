@@ -25,13 +25,13 @@
 - name: Create hashmap field mappings
   vars:
     field_id: "{{ (hashmap_field.stdout | from_json | selectattr('Name', 'equalto', field.name) | first)['Field ID'] }}"
-    group_id: "{{ (hashmap_groups.stdout | from_json | selectattr('Name', 'equalto', item.group) | first)['Group ID'] }}"
+    group_id: "{{ (hashmap_groups.stdout | from_json | selectattr('Name', 'equalto', item.group) | first)['Group ID'] | default('') }}"
   command: >
     {{ openstack }} rating hashmap mapping create
     {{ item.cost }}
     --field-id {{ field_id }}
     --value {{ item.value }}
-    --group-id {{ group_id }}
+    {% if group_id | length > 0 %}--group-id {{ group_id }}{% endif %}
     --type {{ item.type }}
   loop: "{{ field.mappings }}"
   # Condition could be better, but should work with current values.

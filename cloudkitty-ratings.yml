@@ -14,7 +14,7 @@
     # The mappings field is a list, where each item is a dict with the following fields:
     # * value
     # * cost
-    # * group
+    # * group (optional)
     # * type
     # For example, for per-instance rating:
     # - service: instance
@@ -33,7 +33,7 @@
     # Each item is a dict with the following fields:
     # * service
     # * cost
-    # * group
+    # * group (optional)
     # * type
     # For example, for image image storage (MB)
     # - service: image.size
@@ -90,12 +90,14 @@
     - name: Create hashmap groups
       vars:
         existing_groups: "{{ hashmap_groups.stdout | from_json | map(attribute='Name') | list }}"
-        field_mapping_groups: "{{ query('subelements', cloudkitty_hashmap_field_mappings, 'mappings') | map(attribute='1.group') | list }}"
-        service_mapping_groups: "{{ cloudkitty_hashmap_service_mappings | map(attribute='group') | list }}"
+        field_mapping_groups: "{{ query('subelements', cloudkitty_hashmap_field_mappings, 'mappings') | map(attribute='1.group') | select('defined') | list }}"
+        service_mapping_groups: "{{ cloudkitty_hashmap_service_mappings | map(attribute='group') | select('defined') | list }}"
       command: >
         {{ openstack }} rating hashmap group create {{ item }}
       loop: "{{ (field_mapping_groups + service_mapping_groups) | unique | list }}"
-      when: item not in existing_groups
+      when:
+        - item is not none and item | length > 0
+        - item not in existing_groups
       changed_when: true
 
     # List again to get IDs of created services.
@@ -149,12 +151,12 @@
         mappings_result: "{{ hashmap_mappings.results | selectattr('item', 'equalto', item.service) | first }}"
         mappings: "{{ mappings_result.stdout | from_json }}"
         service_id: "{{ (hashmap_services.stdout | from_json | selectattr('Name', 'equalto', item.service) | first)['Service ID'] }}"
-        group_id: "{{ (hashmap_groups.stdout | from_json | selectattr('Name', 'equalto', item.group) | first)['Group ID'] }}"
+        group_id: "{{ (hashmap_groups.stdout | from_json | selectattr('Name', 'equalto', item.group) | first)['Group ID'] | default('') }}"
       command: >
         {{ openstack }} rating hashmap mapping create
         {{ item.cost }}
         --service-id {{ service_id }}
-        --group-id {{ group_id }}
+        {% if group_id | length > 0 %}--group-id {{ group_id }}{% endif %}
         --type {{ item.type }}
       loop: "{{ cloudkitty_hashmap_service_mappings }}"
       # Condition could be better, but should work with current values.
