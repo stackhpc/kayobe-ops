@@ -21,7 +21,7 @@ minimum_master_nodes: 1
 
 # Configure hostnames for Wazuh indexer nodes
 # Example es1.example.com, es2.example.com
-domain_name: "wazuh.the-dma.uk"
+domain_name: "example.com"
 
 # Ansible control host certificate directory
 local_certs_path: "{{ playbook_dir }}/vars/certificates/"
