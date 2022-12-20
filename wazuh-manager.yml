@@ -1,135 +1,67 @@
 ---
-- hosts: wazuh
-  become: yes
-  vars_files:
-    - "{{ playbook_dir }}/vars/wazuh-manager.yml"
-    - "{{ playbook_dir }}/vars/wazuh-secrets.yml"
-  pre_tasks:
-    - name: Load http_proxy vars if present
-      include_vars:
-        dir: "{{ playbook_dir }}/vars"
-        files_matching: "https_proxy.yml"
+# Certificates generation
+  - hosts: localhost
+    vars_files:
+      - "{{ playbook_dir }}/vars/wazuh-single.yml"
+      - "{{ playbook_dir }}/vars/wazuh-secrets.yml"
+    roles:
+      - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/wazuh-indexer"
+        perform_installation: false
+    become: no
+    #become_user: root
+    vars:
+      indexer_node_master: true
+      instances:
+        node1:
+          name: "{{ indexer_node_name }}"      # Important: must be equal to indexer_node_name.
+          ip: "{{ indexer_network_host }}"
+          role: indexer
+    tags:
+      - generate-certs
+# Single node
+  - hosts: wazuh-master
+    vars_files:
+       - "{{ playbook_dir }}/vars/wazuh-single.yml"
+    become: yes
+    become_user: root
+    roles:
+      - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/wazuh-indexer"
+      - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/ansible-wazuh-manager"
+      - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/ansible-filebeat-oss"
+      - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/wazuh-dashboard"
+    vars:
+      single_node: true
+      minimum_master_nodes: 1
+      indexer_node_master: true
+      indexer_network_host: "{{ indexer_network_host }}"
+      filebeat_node_name: "{{ indexer_node_name }}"
+      filebeat_output_indexer_hosts:
+      - "{{ indexer_network_host }}"
+      instances:
+        node1:
+          name: "{{ indexer_node_name }}"       # Important: must be equal to indexer_node_name.
+          ip: "{{ indexer_network_host }}"
+          role: indexer
+      ansible_shell_allow_world_readable_temp: true
 
-    - name: Locally install packages required for opendistro cert generation
-      package:
-        name:
-          - curl
-          - unzip
-          - wget
-          - libcap
-          - java-11-openjdk-devel
-        state: present
-      delegate_to: localhost
-      when: ansible_os_family == 'RedHat'
+      post_tasks:
+        - name: Set http/s_proxy vars in ossec-init.conf for vulnerability detector
+          blockinfile:
+            path: "/var/ossec/etc/ossec.conf"
+            state: present
+            owner: root
+            group: ossec
+            block: |
+              HTTPS_PROXY={{ http_proxy_url }}
+              HTTP_PROXY={{ http_proxy_url }}
+            backup: yes
+          when: http_proxy_url is defined
+          notify:
+            - Restart wazuh
 
-  roles:
-    - "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/opendistro/opendistro-elasticsearch"
-    - "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/ansible-wazuh-manager"
-    - "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/ansible-filebeat-oss"
-    - "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/opendistro/opendistro-kibana"
+    handlers:
+      - name: Restart wazuh
+        service:
+          name: wazuh-manager
+          state: restarted
 
-  post_tasks:
-    - name: Set http/s_proxy vars in ossec-init.conf for vulnerability detector
-      blockinfile:
-        path: "/etc/ossec-init.conf"
-        state: present
-        owner: root
-        group: ossec
-        block: |
-          HTTPS_PROXY={{ http_proxy_url }}
-          HTTP_PROXY={{ http_proxy_url }}
-        backup: yes
-      when: http_proxy_url is defined
-      notify:
-        - Restart wazuh
-
-    - name: Check for elasticsearch performance analyser
-      command:
-        cmd: /usr/share/elasticsearch/bin/elasticsearch-plugin list
-      changed_when: no
-      register: elasticsearch_plugins
-
-    - name: Remove elasticsearch performance analyser
-      command:
-        cmd: /usr/share/elasticsearch/bin/elasticsearch-plugin remove opendistro_performance_analyzer
-      when: "'opendistro_performance_analyzer' in elasticsearch_plugins.stdout"
-      notify:
-        - Restart elasticsearch
-
-    - name: Include elasticsearch custom vars
-      include_vars:
-        file: "{{ playbook_dir }}/vars/elasticsearch-custom.yml"
-
-    - name: Add custom elasticsearch users
-      blockinfile:
-        path: "{{ opendistro_sec_plugin_conf_path }}/internal_users.yml"
-        state: present
-        owner: root
-        group: elasticsearch
-        block: "{{ elasticsearch_custom_internal_users }}"
-        backup: yes
-      when: elasticsearch_custom_internal_users is defined
-      notify:
-        - Apply elasticsearch custom vars
-        - Restart elasticsearch
-
-    - name: Add wazuh elasticsearch roles
-      blockinfile:
-        path: "{{ opendistro_sec_plugin_conf_path }}/roles.yml"
-        state: present
-        owner: root
-        group: elasticsearch
-        block: "{{ elasticsearch_custom_roles }}"
-        backup: yes
-      when: elasticsearch_custom_roles is defined
-      notify:
-        - Apply elasticsearch custom vars
-        - Restart elasticsearch
-
-    - name: Add wazuh elasticsearch roles mapping
-      blockinfile:
-        path: "{{ opendistro_sec_plugin_conf_path }}/roles_mapping.yml"
-        state: present
-        owner: root
-        group: elasticsearch
-        block: "{{ elasticsearch_custom_roles_mapping }}"
-        backup: yes
-      when: elasticsearch_custom_roles_mapping is defined
-      notify:
-        - Apply elasticsearch custom vars
-        - Restart elasticsearch
-
-    - name: Fix Kibana multitenancy config
-      lineinfile:
-        path: "{{ kibana_conf_path }}/kibana.yml"
-        regexp: '^opendistro_security\.multitenancy\.enabled:'
-        line: 'opendistro_security.multitenancy.enabled: true'
-      notify:
-        - Restart kibana
-
-  handlers:
-    - name: Apply elasticsearch custom vars
-      command: >-
-        {{ opendistro_sec_plugin_tools_path }}/securityadmin.sh
-        -cacert {{ opendistro_conf_path }}/root-ca.pem
-        -cert {{ opendistro_conf_path }}/admin.pem
-        -key {{ opendistro_conf_path }}/admin.key
-        -cd {{ opendistro_sec_plugin_conf_path }}/
-        -nhnv -icl
-        -h {{ elasticsearch_network_host }}
-      run_once: true
-
-    - name: Restart elasticsearch
-      service:
-        name: elasticsearch
-        state: restarted
-
-    - name: Restart kibana
-      service:
-        name: kibana
-        state: restarted
-
-    - name: Restart wazuh
-      service:
-        name: wazuh-manager
-        state: restarted
