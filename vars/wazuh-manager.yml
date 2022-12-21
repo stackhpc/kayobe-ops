@@ -17,7 +17,7 @@ wazuh_manager_ip: "{{ provision_oc_net_name | net_ip(inventory_hostname) }}"
 # Single node setup
 single_node: true
 minimum_master_nodes: 1
-
+indexer_node_master: true
 
 # Configure hostnames for Wazuh indexer nodes
 # Example es1.example.com, es2.example.com
@@ -35,6 +35,14 @@ indexer_network_host: "{{ provision_oc_net_name | net_ip(inventory_hostname) }}"
 # Even in a single node setup this must be defined. If not defaults to 127.0.0.1
 indexer_cluster_nodes:
   - "{{ indexer_network_host }}"
+
+instances:
+  node1:
+    name: "{{ indexer_node_name }}"       # Important: must be equal to indexer_node_name.
+    ip: "{{ indexer_network_host }}"
+    role: indexer
+
+ansible_shell_allow_world_readable_temp: true
 
 # Filebeat variables
 filebeat_node_name: "{{ indexer_node_name }}"
