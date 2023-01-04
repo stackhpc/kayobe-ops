@@ -24,7 +24,10 @@ indexer_node_master: true
 domain_name: "example.com"
 
 # Ansible control host certificate directory
-local_certs_path: "{{ playbook_dir }}/vars/certificates/"
+local_certs_path: "{{ playbook_dir }}/vars/certificates"
+
+# Ansible control host custom certificates directory
+local_custom_certs_path: "{{ playbook_dir }}/vars/custom_certificates"
 
 # Indexer variables
 indexer_node_name: "{{ inventory_hostname }}"
@@ -38,8 +41,8 @@ indexer_cluster_nodes:
 
 instances:
   node1:
-    name: "{{ indexer_node_name }}"       # Important: must be equal to indexer_node_name.
-    ip: "{{ indexer_network_host }}"
+    name: "{{ groups['wazuh-master'][0] }}"
+    ip: "{{ admin_oc_net_name | net_ip(groups['wazuh-master'][0]) }}"
     role: indexer
 
 ansible_shell_allow_world_readable_temp: true
@@ -150,3 +153,5 @@ wazuh_manager_vulnerability_detector:
       update_from_year: '2010'
       update_interval: '1h'
       name: '"nvd"'
+
+

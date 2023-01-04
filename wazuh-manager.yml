@@ -2,7 +2,7 @@
 # Certificates generation
 - hosts: localhost
   vars_files:
-    - "{{ playbook_dir }}/vars/wazuh-single.yml"
+    - "{{ playbook_dir }}/vars/wazuh-manager.yml"
     - "{{ playbook_dir }}/vars/wazuh-secrets.yml"
   roles:
     - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/wazuh-indexer"
@@ -14,14 +14,14 @@
 # Single node
 - hosts: wazuh-master
   vars_files:
-     - "{{ playbook_dir }}/vars/wazuh-single.yml"
+    - "{{ playbook_dir }}/vars/wazuh-manager.yml"
   become: yes
   become_user: root
   roles:
     - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/wazuh-indexer"
     - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/ansible-wazuh-manager"
     - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/ansible-filebeat-oss"
-    - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/wazuh-dashboard"  
+    - role: "{{ playbook_dir }}/roles/wazuh-ansible/wazuh-ansible/roles/wazuh/wazuh-dashboard"
   post_tasks:
     - name: Set http/s_proxy vars in ossec-init.conf for vulnerability detector
       blockinfile:
@@ -36,9 +36,36 @@
       when: http_proxy_url is defined
       notify:
         - Restart wazuh
+
+    - name: Check if custom certificates exists
+      stat:
+        path: "{{ local_custom_certs_path }}"
+      register: custom_certificates_folder
+      delegate_to: localhost
+      become: no
+
+    - name: Copy the node & admin certificates to Wazuh dashboard
+      copy:
+        src: "{{ local_custom_certs_path }}/{{ item }}"
+        dest: /etc/wazuh-dashboard/certs/
+        owner: wazuh-dashboard
+        group: wazuh-dashboard
+        mode: 0400
+      with_items:
+        - "{{ indexer_node_name }}-key.pem"
+        - "{{ indexer_node_name }}.pem"
+      when: custom_certificates_folder.stat.exists
+      notify:
+        - Restart wazuh-dashboard
+
   handlers:
     - name: Restart wazuh
       service:
         name: wazuh-manager
+        state: restarted
+
+    - name: Restart wazuh-dashboard
+      service:
+        name: wazuh-dashboard
         state: restarted
 
