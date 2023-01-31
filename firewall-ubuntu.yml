@@ -1,0 +1,166 @@
+---
+# Playbook to be used as a hook for 'kayobe overcloud host configure' command
+# Create symbolic link in '${KAYOBE_CONFIG_PATH}/hooks/overcloud-host-configure/post.d/' folder
+# ln -s ../../../ansible/firewall.yml 10-firewall.yml
+- name: Firewall for PublicAPI interfaces
+  hosts: controllers
+  become: true
+  tags:
+    - network
+  vars:
+    firewall_net_interface: "{{ public_net_name | net_interface }}"
+  tasks:
+    - name: Include Kolla-Ansible variables
+      include_vars: "../../../../kolla-ansible/ansible/group_vars/all.yml"
+
+    - name: Install ufw
+      package:
+        name: ufw
+        state: present
+
+    - name: Default policy is allow
+      ufw:
+        comment: "default policy is allow"
+        state: "enabled"
+        direction: "incoming"
+        policy: "allow"
+
+    - name: Add firewall rules for openstack services
+      ufw:
+        comment: "enabled OpenStack service"
+        port: "{{ item.port }}"
+        proto: "tcp"
+        interface_in: "{{ firewall_net_interface }}"
+        rule: "allow"
+      when: item.when
+      with_items:
+        # horizon80
+        - port: "{{ horizon_port }}"
+          when: "{{ kolla_enable_horizon | bool }}"
+        # horizon443
+        - port: "{% if kolla_enable_tls_external|bool %}443{% else %}{{ horizon_port }}{% endif %}"
+          when: "{{ kolla_enable_horizon | bool }}"
+        # keystone
+        - port: "{{ keystone_public_listen_port }}"
+          when: "{{ kolla_enable_keystone | bool }}"
+        # nova_api
+        - port: "{{ nova_api_listen_port }}"
+          when: "{{ kolla_enable_nova | bool }}"
+        # nova_novnc
+        - port: "{{ nova_novncproxy_listen_port }}"
+          when: "{{ kolla_enable_nova | bool }}"
+        # neutron
+        - port: "{{ neutron_server_listen_port }}"
+          when: "{{ kolla_enable_neutron | bool }}"
+        # cinder
+        - port: "{{ cinder_api_listen_port }}"
+          when: "{{ kolla_enable_cinder | bool }}"
+        # glance
+        - port: "{{ glance_api_listen_port }}"
+          when: "{{ kolla_enable_glance | bool }}"
+        # heat
+        - port: "{{ heat_api_listen_port }}"
+          when: "{{ kolla_enable_heat | bool }}"
+        # heat_cfn
+        - port: "{{ heat_api_cfn_listen_port }}"
+          when: "{{ kolla_enable_heat | bool }}"
+        # octavia
+        - port: "{{ octavia_api_listen_port }}"
+          when: "{{ kolla_enable_octavia | bool }}"
+        # monasca
+        - port: "{{ monasca_api_port }}"
+          when: "{{ kolla_enable_monasca | bool }}"
+        # kibana
+        - port: "{{ kibana_server_port }}"
+          when: "{{ kolla_enable_kibana | bool }}"
+        # grafana
+        - port: "{{ grafana_server_port }}"
+          when: "{{ kolla_enable_grafana | bool }}"
+        # monasca_grafana
+        - port: "{{ monasca_grafana_server_port }}"
+          when: "{{ kolla_enable_monasca | bool }}"
+        # placement
+        - port: "{{ placement_api_listen_port }}"
+          when: "{{ kolla_enable_placement | bool }}"
+        # designate
+        - port: "{{ designate_api_listen_port }}"
+          when: "{{ kolla_enable_designate | bool }}"
+        # barbican
+        - port: "{{ barbican_api_listen_port }}"
+          when: "{{ kolla_enable_barbican | bool }}"
+        # magnum
+        - port: "{{ magnum_api_port }}"
+          when: "{{ kolla_enable_magnum | bool }}"
+        # aodh
+        - port: "{{ aodh_api_listen_port }}"
+          when: "{{ kolla_enable_aodh | bool }}"
+        # gnocchi
+        - port: "{{ gnocchi_api_listen_port }}"
+          when: "{{ kolla_enable_gnocchi | bool }}"
+        # ironic_api
+        - port: "{{ ironic_api_listen_port }}"
+          when: "{{ kolla_enable_ironic | bool }}"
+        # ironic_inspector
+        - port: "{{ ironic_inspector_listen_port }}"
+          when: "{{ kolla_enable_ironic | bool }}"
+        # senlin
+        - port: "{{ senlin_api_listen_port }}"
+          when: "{{ kolla_enable_senlin | bool }}"
+        # mistral
+        - port: "{{ mistral_api_port }}"
+          when: "{{ kolla_enable_mistral | bool }}"
+        # panko
+        - port: "{{ panko_api_port }}"
+          when: "{{ kolla_enable_panko | bool }}"
+        # sahara
+        - port: "{{ sahara_api_port }}"
+          when: "{{ kolla_enable_sahara | bool }}"
+        # skydive
+        - port: "{{ skydive_analyzer_port }}"
+          when: "{{ kolla_enable_skydive | bool }}"
+        # blazar
+        - port: "{{ blazar_api_port }}"
+          when: "{{ kolla_enable_blazar | bool }}"
+        # swift
+        - port: "{{ swift_proxy_server_listen_port }}"
+          when: "{{ kolla_enable_swift | bool }}"
+        # cloudkitty
+        - port: "{{ cloudkitty_api_port }}"
+          when: "{{ kolla_enable_cloudkitty | bool }}"
+        # tacker
+        - port: "{{ tacker_server_port }}"
+          when: "{{ kolla_enable_tacker | bool }}"
+        # vitrage
+        - port: "{{ vitrage_api_port }}"
+          when: "{{ kolla_enable_vitrage | bool }}"
+        # trove
+        - port: "{{ trove_api_port }}"
+          when: "{{ kolla_enable_trove | bool }}"
+        # freezer
+        - port: "{{ freezer_api_port }}"
+          when: "{{ kolla_enable_freezer | bool }}"
+        # masakari
+        - port: "{{ masakari_api_port }}"
+          when: "{{ kolla_enable_masakari | bool }}"
+        # manila
+        - port: "{{ manila_api_port }}"
+          when: "{{ kolla_enable_manila | bool }}"
+        # Hashicorp Vault (for Barbican)
+        - port: 8200
+          when: true
+        - port: 8201
+          when: true
+
+    - name: Deny services from PublicAPI interface
+      ufw:
+        comment: "deny services from PublicAPI interface"
+        interface_in: "{{ firewall_net_interface }}"
+        state: "enabled"
+        rule: "deny"
+        insert_relative_to: "last-ipv4"
+
+    - name: "Enable firewall service"
+      service:
+        name: ufw
+        state: restarted
+        enabled: yes
