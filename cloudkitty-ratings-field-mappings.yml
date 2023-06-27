@@ -25,7 +25,7 @@
 - name: Create hashmap field mappings
   vars:
     field_id: "{{ (hashmap_field.stdout | from_json | selectattr('Name', 'equalto', field.name) | first)['Field ID'] }}"
-    group_id: "{{ (hashmap_groups.stdout | from_json | selectattr('Name', 'equalto', item.group) | first)['Group ID'] | default('') }}"
+    group_id: "{{ (hashmap_groups.stdout | from_json | selectattr('Name', 'equalto', item.group) | first)['Group ID'] | default('') if item.group is defined else '' }}"
   command: >
     {{ openstack }} rating hashmap mapping create
     {{ item.cost }}
