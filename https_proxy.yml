@@ -12,7 +12,7 @@
     - proxy
   vars:
     http_proxy: "http://{{ provision_oc_net_name | net_ip('seed-vm')}}:3128"
-    no_proxy: "127.0.0.1,{{ internal_net_vip_address }},{{ internal_net_name | net_ip }}"
+    no_proxy: "localhost,127.0.0.1,{{ internal_net_vip_address }},{{ internal_net_name | net_ip }}"
   tasks:
     - name: Write http_proxy parameters to bashrc file
       lineinfile:
