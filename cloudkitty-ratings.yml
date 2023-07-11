@@ -151,7 +151,7 @@
         mappings_result: "{{ hashmap_mappings.results | selectattr('item', 'equalto', item.service) | first }}"
         mappings: "{{ mappings_result.stdout | from_json }}"
         service_id: "{{ (hashmap_services.stdout | from_json | selectattr('Name', 'equalto', item.service) | first)['Service ID'] }}"
-        group_id: "{{ (hashmap_groups.stdout | from_json | selectattr('Name', 'equalto', item.group) | first)['Group ID'] | default('') }}"
+        group_id: "{{ (hashmap_groups.stdout | from_json | selectattr('Name', 'equalto', item.group) | first)['Group ID'] | default('') if item.group is defined else '' }}"
       command: >
         {{ openstack }} rating hashmap mapping create
         {{ item.cost }}
