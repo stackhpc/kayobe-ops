@@ -1,7 +1,7 @@
 ---
 - name: Register Cloudkitty ratings
   hosts: controllers[0]
-  gather_facts: no
+  gather_facts: yes
   environment: "{{ openstack_auth_env }}"
   vars:
     venv: "{{ virtualenv_path }}/cloudkitty"
@@ -47,6 +47,7 @@
     - name: Set up openstack cli virtualenv
       pip:
         virtualenv: "{{ venv }}"
+        virtualenv_command: "python3.{{ ansible_facts.python.version.minor }} -m venv"
         name:
           - python-cloudkittyclient
           - python-openstackclient
